@@ -7,7 +7,7 @@ from .models import Booking
 from datetime import datetime
 import json
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 
 # Create your views here.
@@ -19,7 +19,7 @@ def about(request):
 
 def reservations(request):
     date = request.GET.get('date',datetime.today().date())
-    bookings = Booking.objects.all()
+    bookings = Booking.objects.all().filter(reservation_date=date)
     booking_json = serializers.serialize('json', bookings)
     return render(request, 'bookings.html',{"bookings":booking_json})
 
@@ -49,22 +49,27 @@ def display_menu_item(request, pk=None):
 @csrf_exempt
 def bookings(request):
     if request.method == 'POST':
-        data = json.load(request)
+        data = json.loads(request.body)
         exist = Booking.objects.filter(reservation_date=data['reservation_date']).filter(
             reservation_slot=data['reservation_slot']).exists()
-        if exist==False:
+        if not exist:
             booking = Booking(
                 first_name=data['first_name'],
                 reservation_date=data['reservation_date'],
                 reservation_slot=data['reservation_slot'],
             )
             booking.save()
+            return HttpResponse("{'error': 0}", content_type='application/json')
         else:
-            return HttpResponse("{'error':1}", content_type='application/json')
+            return HttpResponse("{'error': 1}", content_type='application/json')
     
     date = request.GET.get('date',datetime.today().date())
 
     bookings = Booking.objects.all().filter(reservation_date=date)
-    booking_json = serializers.serialize('json', bookings)
+    if bookings:
+        booking_json = serializers.serialize('json', bookings)
+        return HttpResponse(booking_json, content_type='application/json')
+    else:
+        return HttpResponse("No Bookings", content_type='application/json')
 
-    return HttpResponse(booking_json, content_type='application/json')
+    
